@@ -1,212 +1,100 @@
 # AskUp Chatbot
 
-A lightweight Flask-based chatbot API that uses the Hugging Face `facebook/blenderbot-400M-distill` model to generate conversational responses.
-
-## Overview
-
-This project exposes a single HTTP endpoint for sending a prompt and returning a chatbot reply. It keeps a short in-memory conversation history so the model can respond in context for recent turns.
-
-The app is intentionally simple and is a good starting point for:
-
-- local chatbot experimentation
-- building a small backend around a Hugging Face conversational model
-- learning how to serve a model through Flask
+AskUp is a small Flask chatbot with a browser-based chat interface. It uses Hugging Face Transformers and the `facebook/blenderbot-400M-distill` model to generate replies.
 
 ## Project Structure
 
 ```text
 askup/
-├── app.py
-├── my_env/
 ├── README.md
-└── __pycache__/
+├── my_env/                     # Optional local Python virtual environment
+└── LLM_application_chatbot/
+   ├── app.py                   # Flask routes and model integration
+   ├── requirements.txt
+   ├── Dockerfile
+   ├── static/                  # JavaScript, styles, and images
+   └── templates/
+      └── index.html
 ```
-
-### Files
-
-- `app.py` — Flask app, model loading, conversation handling, and API route
-- `my_env/` — local Python virtual environment used for dependencies
-- `README.md` — project documentation
-
-## Features
-
-- Flask API server
-- Hugging Face Transformers model integration
-- In-memory recent chat history for short context retention
-- JSON request handling for chat prompts
-- CORS enabled for cross-origin requests
 
 ## Requirements
 
-This project uses Python 3.11 and the following main dependencies:
+- Python 3.10 or newer
+- Internet access on first startup to download the model and tokenizer from Hugging Face
+- Enough memory and disk space to load the BlenderBot model
 
-- Flask
-- Flask-CORS
-- transformers
-- torch
-- sentencepiece (sometimes needed depending on model tokenizer support)
+Python packages are listed in `LLM_application_chatbot/requirements.txt`.
 
-The workspace already includes a local virtual environment in `my_env/`, which is the recommended environment to use.
+## Set Up and Run on Windows
 
-## Setup
-
-1. Open a terminal in the project root.
-2. Activate the virtual environment:
-
-   On Windows PowerShell:
-
-   ```powershell
-   .\my_env\Scripts\Activate.ps1
-   ```
-
-   On Command Prompt:
-
-   ```bat
-   my_env\Scripts\activate.bat
-   ```
-
-3. Confirm Python is available from the environment:
-
-   ```powershell
-   python --version
-   ```
-
-4. Install any missing dependencies if needed:
-
-   ```powershell
-   python -m pip install flask flask-cors transformers torch
-   ```
-
-> The first time the app runs, Hugging Face will download the BlenderBot model and tokenizer. This may take a few minutes depending on your internet connection.
-
-## Running the App
-
-From the project root:
+Run these commands from the repository root (`askup`):
 
 ```powershell
-python app.py
+py -m venv my_env
+.\my_env\Scripts\Activate.ps1
+cd .\LLM_application_chatbot
+python -m pip install -r requirements.txt
+flask --app app run
 ```
 
-By default, Flask will start a development server, usually at:
+If PowerShell blocks virtual-environment activation, use Command Prompt and run `my_env\Scripts\activate.bat` from the repository root, then continue with the remaining commands.
 
-```text
-http://127.0.0.1:5000
-```
+On first startup, Hugging Face downloads the model files; this can take a while. Once Flask is running, open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser. Keep the terminal and server running while chatting. You can also start the server with `python app.py` from `LLM_application_chatbot`.
 
-## API
+## Chat API
 
-### Endpoint
+The browser sends requests to the Flask app on the same origin. The endpoint accepts a JSON object and responds with plain text.
 
 ```http
 POST /chatbot
+Content-Type: application/json
 ```
 
-### Request Body
+Request body:
 
 ```json
 {
-  "prompt": "Hello! How are you?"
+   "prompt": "Hello! How are you?"
 }
 ```
 
-### Response
-
-The endpoint returns the generated chatbot reply as plain text.
-
-Example response:
-
-```text
-Hi there! I'm doing well. How can I help you today?
-```
-
-## Example Requests
-
-### cURL
+Example request from a separate terminal:
 
 ```bash
 curl -X POST http://127.0.0.1:5000/chatbot \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Tell me a joke."}'
+   -H "Content-Type: application/json" \
+   -d '{"prompt": "Tell me a joke."}'
 ```
 
-### Python
+The response body is the generated reply as plain text.
 
-```python
-import requests
+## Conversation Behavior
 
-response = requests.post(
-    "http://127.0.0.1:5000/chatbot",
-    json={"prompt": "What is the capital of France?"}
-)
-
-print(response.text)
-```
-
-## How It Works
-
-The app does the following on each request:
-
-1. Reads the JSON payload from the request body.
-2. Keeps only the last 6 conversation turns in memory.
-3. Builds a prompt with the recent history and the latest user message.
-4. Sends the prompt to the BlenderBot model using the tokenizer.
-5. Generates a response with constrained decoding settings.
-6. Stores the new user and bot messages in the conversation history.
-7. Returns the generated reply.
-
-## Notes
-
-- The model is loaded at startup, so the first request may be slower than later ones.
-- Conversation context is kept only in memory and resets when the server restarts.
-- The app is intended for local development and experimentation rather than production deployment.
-- The current implementation is a simple proof-of-concept and does not include authentication, persistent storage, or advanced conversation management.
+- The app retains a short conversation history in server memory. It is not saved to disk and is cleared when the server restarts.
+- The history is global to this Flask process, not separated by browser or user.
+- The model is loaded when the Flask app starts, so startup and the first response can take time.
+- This project is intended for local experimentation. It does not provide authentication or persistent, per-user conversation storage.
 
 ## Troubleshooting
 
-### Model download is slow or fails
+### The browser reports “Failed to fetch”
 
-- Check your internet connection.
-- Make sure Hugging Face can access the model repository.
-- Retry after confirming the environment has internet access.
+- Confirm Flask is still running and finished loading the model.
+- Open the chat page from the Flask address, `http://127.0.0.1:5000/`, rather than opening `index.html` directly or using a different host or port.
+- Check the Flask terminal for a traceback when you submit a message. The page and `/chatbot` request should use the same host and port.
 
-### Import errors
+### Flask cannot find the app
 
-Make sure your environment has the required packages installed:
+Run `flask --app app run` from the `LLM_application_chatbot` directory, not from the repository root.
 
-```powershell
-python -m pip install flask flask-cors transformers torch
-```
+### Model download or import fails
 
-### Server won’t start
-
-- Ensure you are in the project root.
-- Confirm the virtual environment is activated.
-- Check whether another process is already using port 5000.
-
-## Example Development Flow
+Confirm internet access and install the dependencies from the app directory:
 
 ```powershell
-cd c:\Users\Vedant Agrawal\Desktop\askup
-.\my_env\Scripts\Activate.ps1
-python app.py
+python -m pip install -r requirements.txt
 ```
 
-Then send requests to the endpoint using cURL or another HTTP client.
+### The server cannot use port 5000
 
-## License
-
-This project does not include a specific license file. If you plan to share or distribute it, add a license that matches your intended usage.
-
-## Next Ideas
-
-Possible extensions include:
-
-- adding a frontend interface
-- saving chat history to a database
-- supporting user-specific sessions
-- adding streaming responses
-- deploying the app to a production server
-
----
-
-This README was written to match the current implementation in `app.py` and should help you run the project locally and interact with the chatbot API.
+Start Flask on another port with `flask --app app run --port 5001`, then open `http://127.0.0.1:5001/`.
